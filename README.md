@@ -1,6 +1,6 @@
 # Smart Sensor – Simulation smarter Sensoren im Eigenheim
 
-Ein C++-Konsolenprogramm, das smarte Sensoren in einem Zuhause simuliert
+Ein C++-Konsolenprogramm, das smarte Sensoren in einem Wohnhaus simuliert
 (Temperatur, Helligkeit, Luftfeuchte). Ein zentrales Smart-Home-System liest
 die Sensoren zyklisch aus und **reagiert** über Regeln mit Aktoren: Wird es
 kalt, schaltet die Heizung ein; wird es dunkel, geht das Gartenlicht an; ist
