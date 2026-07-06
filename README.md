@@ -199,23 +199,22 @@ Verwendete Befehle:
 
 ## Reflexion
 
-<!-- Sätze 4-6 bei Bedarf an die eigene Erfahrung anpassen -->
-
-Die Einrichtung der Entwicklungsumgebung unter macOS lief problemlos: clang++
-und make waren über die Xcode Command Line Tools vorhanden, das Projekt ließ
-sich sofort kompilieren und starten. Das größte technische Problem war ein
-Fehler in der Terminal-Anzeige: ein Non-Blocking-Flag auf der Standardeingabe
-wirkte auch auf die Ausgabe, sodass zunächst nur ein Sensor sichtbar war –
-gelöst über den termios-Modus (`VMIN = 0`). Auch die Fehlerbehandlung beim
-CSV-Einlesen (unvollständige Zeilen, unlesbare Zahlen, unplausible Werte) hat
-mehr Sorgfalt gebraucht als gedacht. Besonders wiederholen musste ich Zeiger
-und Referenzen sowie das Thema Besitz und Lebensdauer (`unique_ptr` vs.
-non-owning Zeiger). Vererbung und `virtual`/`override` waren nach den Übungen
-dagegen schnell wieder präsent. Noch unsicher bin ich bei Details der
-UML-Notation (Aggregation vs. Komposition) und bei den ANSI-Escape-Sequenzen
-der Anzeige, die über den Kursstoff hinausgehen. Der bewusst erzeugte
-Merge-Konflikt hat geholfen, den Ablauf aus abgelehntem Push, Pull und
-manueller Auflösung einmal komplett durchzuspielen.
+Bei der Einrichtung war die größte Hürde, dass der Kurs von Visual Studio
+unter Windows ausgeht, ich aber auf macOS arbeite – als Ersatz nutze ich
+clang++ und make aus den Xcode Command Line Tools, womit das Projekt dann
+zuverlässig gebaut und gestartet werden konnte. Das größte technische Problem
+war ein Fehler in der Terminal-Anzeige: ein Non-Blocking-Flag auf der
+Standardeingabe wirkte auch auf die Ausgabe, sodass zunächst nur ein Sensor
+sichtbar war – gelöst über den termios-Modus (`VMIN = 0`). Auch die
+Fehlerbehandlung beim CSV-Einlesen (unvollständige Zeilen, unlesbare Zahlen,
+unplausible Werte) hat mehr Sorgfalt gebraucht als gedacht. Besonders
+wiederholen musste ich das Thema Besitz und Lebensdauer (`unique_ptr` vs.
+non-owning Zeiger) sowie Vererbung und Polymorphie (`virtual`/`override`,
+abstrakte Klassen). Noch unsicher bin ich bei den UML-Beziehungen (Aggregation
+vs. Komposition, Pfeilarten) und beim Thema Zeiger und Lebensdauer, etwa wann
+genau ein Dangling Pointer entsteht. Der bewusst erzeugte Merge-Konflikt hat
+geholfen, den Ablauf aus abgelehntem Push, Pull und manueller Auflösung einmal
+komplett durchzuspielen.
 
 ## Team
 
