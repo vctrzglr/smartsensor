@@ -146,4 +146,4 @@ classDiagram
 
 ## Team
 
-- *(Namen der Teammitglieder eintragen)*
+- *Victor Ziegler*
