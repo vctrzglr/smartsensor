@@ -45,6 +45,9 @@ int main() {
     haus.regelHinzufuegen(helligkeit, licht, 150.0, 260.0);   // Licht an, wenn dunkel
     haus.regelHinzufuegen(feuchte, lueftung, 65.0, 55.0);     // lueften, wenn feucht
 
+    // Datenspeicher: Messreihe des letzten Laufs einlesen, neues Protokoll starten
+    haus.messdatenLaden();
+
     // 2) Simulationsschleife -------------------------------------------------
     TerminalGuard terminal;   // RAII: stellt das Terminal am Ende wieder her
     Anzeige anzeige;

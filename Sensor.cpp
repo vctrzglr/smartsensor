@@ -56,12 +56,25 @@ Messwert Sensor::messen(int minuteDesTages) {
     Messwert messwert(wert, einheit, minuteDesTages, gueltig);
 
     if (gueltig) {
-        historie.push_back(messwert);
-        if (historie.size() > MAX_HISTORIE) {
-            historie.erase(historie.begin());
-        }
+        inHistorieAblegen(messwert);
     }
     return messwert;
+}
+
+bool Sensor::messwertLaden(const Messwert& messwert) {
+    double wert = messwert.getZahlenwert();
+    if (!messwert.istGueltig() || wert < bereichVon || wert > bereichBis) {
+        return false;   // auch alte Daten muessen plausibel sein
+    }
+    inHistorieAblegen(messwert);
+    return true;
+}
+
+void Sensor::inHistorieAblegen(const Messwert& messwert) {
+    historie.push_back(messwert);
+    if (historie.size() > MAX_HISTORIE) {
+        historie.erase(historie.begin());
+    }
 }
 
 bool Sensor::kalibrieren() {

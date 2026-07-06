@@ -24,6 +24,8 @@ private:
 
     static const std::size_t MAX_HISTORIE = 288;   // ein kompletter Simulationstag
 
+    void inHistorieAblegen(const Messwert& messwert);
+
 public:
     Sensor(std::string name, std::string einheit,
            double bereichVon, double bereichBis,
@@ -35,6 +37,10 @@ public:
 
     bool kalibrieren();                          // setzt den Offset zurueck
     void setBetriebszustand(bool an);
+
+    // Uebernimmt einen frueher aufgezeichneten Messwert (z.B. aus der
+    // CSV-Datei) in die Historie, sofern er im plausiblen Bereich liegt.
+    bool messwertLaden(const Messwert& messwert);
 
     // Rueckwirkung eines Aktors auf die Umgebung (Standard: keine Wirkung).
     // Wird von den Unterklassen ueberschrieben, z.B. Heizung waermt den Raum.

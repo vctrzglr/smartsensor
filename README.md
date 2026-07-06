@@ -9,7 +9,10 @@ Simulation zurück (die Heizung wärmt den Raum wirklich auf), so dass ein
 echter Regelkreis entsteht.
 
 Alles wird live in einem farbigen Terminal-Dashboard angezeigt und zusätzlich
-als CSV-Datei (`messdaten.csv`) protokolliert.
+als CSV-Datei (`messdaten.csv`) protokolliert. Beim nächsten Programmstart wird
+dieses Protokoll wieder **eingelesen** (fehlende Datei, unvollständige Zeilen,
+unlesbare Zahlen und unplausible Werte werden abgefangen), sodass Statistik und
+Verlaufskurven nahtlos an die letzte Sitzung anknüpfen.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
@@ -109,6 +112,7 @@ classDiagram
         -vector~unique_ptr~Aktor~~ aktoren
         -vector~Regel~ regeln
         +simulationsschritt()
+        +messdatenLaden()
     }
     class Anzeige {
         +zeichnen(haus, intervall, pause)
@@ -138,8 +142,10 @@ classDiagram
 | Referenzen und `const`               | const-Getter, `const`-Referenzen als Parameter (`Anzeige::zeichnen`)          |
 | Komposition vs. Assoziation          | `SmartHome` besitzt Sensoren/Aktoren (`unique_ptr`), `Regel` kennt sie nur (non-owning Zeiger) |
 | Lebensdauer / RAII                   | `TerminalGuard` stellt das Terminal im Destruktor wieder her                  |
+| Entwurfsmuster (Patterns)            | **Template Method**: `Sensor::messen()` steuert den festen Messablauf und ruft die rein virtuelle `simuliereRohwert()` der Unterklassen; **RAII** im `TerminalGuard` |
 | Container der Standardbibliothek     | `std::vector` für Historie, Sensoren, Regeln, Ereignisse                      |
-| Datenspeicher (Datei)                | Messwerte werden mit `std::ofstream` als CSV geschrieben                      |
+| Datenspeicher (Datei)                | Messwerte werden mit `std::ofstream` als CSV geschrieben und beim Start mit `std::ifstream` wieder eingelesen (`SmartHome::messdatenLaden`) |
+| Fehlerbehandlung beim Einlesen       | defektes/fehlendes CSV wird abgefangen, ungültige Zeilen werden gezählt und übersprungen |
 | Statistik als eigene Funktionen      | `Sensor::minimum()`, `maximum()`, `mittelwert()`                              |
 | Plausibilitätsprüfung                | unplausible Messwerte werden erkannt, verworfen und als Störung gemeldet      |
 | Grafische Darstellung                | Balkenanzeige + Verlaufskurve (Sparkline) je Sensor im Dashboard              |

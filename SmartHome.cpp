@@ -1,4 +1,5 @@
 #include "SmartHome.h"
+#include <exception>
 #include <iomanip>
 #include <sstream>
 
@@ -70,11 +71,7 @@ std::string Regel::anwenden() {
 // ---------------------------------------------------------------------------
 
 SmartHome::SmartHome(std::string name, const std::string& csvPfad)
-    : name(name), minuteDesTages(355), tag(1) {
-    csvDatei.open(csvPfad);   // Protokoll des aktuellen Laufs
-    if (csvDatei.is_open()) {
-        csvDatei << "Tag;Uhrzeit;Sensor;Messwert;Einheit\n";
-    }
+    : name(name), minuteDesTages(355), tag(1), csvPfad(csvPfad) {
     ereignis("System \"" + name + "\" gestartet");
 }
 
@@ -91,6 +88,74 @@ Aktor* SmartHome::aktorHinzufuegen(const std::string& aktorName) {
 void SmartHome::regelHinzufuegen(Sensor* sensor, Aktor* aktor,
                                  double einSchwelle, double ausSchwelle) {
     regeln.push_back(Regel(sensor, aktor, einSchwelle, ausSchwelle));
+}
+
+void SmartHome::messdatenLaden() {
+    // 1) vorhandenes Protokoll einlesen (falls es eines gibt)
+    std::ifstream eingabe(csvPfad);
+    int geladen = 0;
+    int uebersprungen = 0;
+    if (eingabe.is_open()) {
+        std::string zeile;
+        std::getline(eingabe, zeile);   // Kopfzeile ueberspringen
+        while (std::getline(eingabe, zeile)) {
+            if (zeile.empty()) {
+                continue;
+            }
+            if (messzeileEinlesen(zeile)) {
+                geladen++;
+            } else {
+                uebersprungen++;
+            }
+        }
+        eingabe.close();
+    }
+
+    // 2) neues Protokoll beginnen (alte Datei wird ueberschrieben)
+    csvDatei.open(csvPfad);
+    if (csvDatei.is_open()) {
+        csvDatei << "Tag;Uhrzeit;Sensor;Messwert;Einheit\n";
+    }
+
+    if (geladen > 0) {
+        std::string text = std::to_string(geladen) + " Messwerte aus " + csvPfad + " übernommen";
+        if (uebersprungen > 0) {
+            text += " (" + std::to_string(uebersprungen) + " ungültige Zeilen übersprungen)";
+        }
+        ereignis(text);
+    } else {
+        ereignis("Keine früheren Messdaten gefunden – neue Aufzeichnung: " + csvPfad);
+    }
+}
+
+// Eine CSV-Zeile im Format "Tag;HH:MM;Sensorname;Zahlenwert;Einheit" einlesen.
+// Liefert false bei jedem Fehler (Format, Zahl, Uhrzeit, unbekannter Sensor).
+bool SmartHome::messzeileEinlesen(const std::string& zeile) {
+    std::istringstream strom(zeile);
+    std::string tagFeld, zeitFeld, nameFeld, wertFeld, einheitFeld;
+    if (!std::getline(strom, tagFeld, ';') || !std::getline(strom, zeitFeld, ';')
+        || !std::getline(strom, nameFeld, ';') || !std::getline(strom, wertFeld, ';')
+        || !std::getline(strom, einheitFeld)) {
+        return false;   // Zeile unvollstaendig
+    }
+    if (zeitFeld.size() != 5 || zeitFeld[2] != ':') {
+        return false;   // Uhrzeit nicht im Format HH:MM
+    }
+    try {
+        int minute = std::stoi(zeitFeld.substr(0, 2)) * 60 + std::stoi(zeitFeld.substr(3, 2));
+        if (minute < 0 || minute >= 24 * 60) {
+            return false;
+        }
+        double wert = std::stod(wertFeld);
+        for (const std::unique_ptr<Sensor>& sensor : sensoren) {
+            if (sensor->getName() == nameFeld) {
+                return sensor->messwertLaden(Messwert(wert, einheitFeld, minute));
+            }
+        }
+    } catch (const std::exception&) {
+        return false;   // Zahl nicht lesbar (stoi/stod)
+    }
+    return false;   // unbekannter Sensor
 }
 
 void SmartHome::simulationsschritt() {

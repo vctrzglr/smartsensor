@@ -54,12 +54,14 @@ private:
     std::vector<std::string> ereignisse;   // neuestes Ereignis vorn
     int minuteDesTages;
     int tag;
+    std::string csvPfad;
     std::ofstream csvDatei;
 
     static const std::size_t MAX_EREIGNISSE = 60;
     static const int MINUTEN_PRO_SCHRITT = 5;
 
     void ereignis(const std::string& text);
+    bool messzeileEinlesen(const std::string& zeile);
 
 public:
     SmartHome(std::string name, const std::string& csvPfad);
@@ -70,6 +72,12 @@ public:
     Aktor* aktorHinzufuegen(const std::string& aktorName);
     void regelHinzufuegen(Sensor* sensor, Aktor* aktor,
                           double einSchwelle, double ausSchwelle);
+
+    // Liest die Messdaten des letzten Laufs aus der CSV-Datei in die
+    // Sensor-Historien ein (fehlende Datei und ungueltige Zeilen werden
+    // abgefangen) und beginnt danach ein neues Protokoll.
+    // Nach dem Registrieren aller Sensoren aufrufen.
+    void messdatenLaden();
 
     // Ein Simulationsschritt: Uhr weiterstellen, alle Sensoren messen,
     // Regeln anwenden, Messwerte in die CSV-Datei schreiben.
