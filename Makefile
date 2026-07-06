@@ -1,12 +1,21 @@
-CXX      = g++
-CXXFLAGS = -std=c++17 -Wall
+# Smart-Sensor-Simulation
+#   make        -> kompilieren
+#   make run    -> kompilieren und starten
+#   make clean  -> aufraeumen
 
-SRCS = main.cpp Sensor.cpp Sensoren.cpp SensorStation.cpp
+CXX      = c++
+CXXFLAGS = -std=c++17 -Wall -Wextra -O2
 
-TARGET = smartsensor
+QUELLEN  = $(wildcard *.cpp)
+HEADER   = $(wildcard *.h)
 
-all:
-	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRCS)
+smartsensor: $(QUELLEN) $(HEADER)
+	$(CXX) $(CXXFLAGS) -o $@ $(QUELLEN)
+
+run: smartsensor
+	./smartsensor
 
 clean:
-	rm -f $(TARGET)
+	rm -f smartsensor messdaten.csv
+
+.PHONY: run clean

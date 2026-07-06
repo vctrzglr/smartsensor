@@ -1,58 +1,101 @@
-#include <iostream>
-#include <cstdlib>
-#include <ctime>
-#include "SensorStation.h"
-#include "Sensoren.h"
+// ============================================================================
+//  SMART SENSOR – Simulation smarter Sensoren im Eigenheim
+//
+//  Einstiegspunkt des Programms: hier wird das Smart Home aus Sensoren,
+//  Aktoren und Regeln zusammengebaut und anschliessend die Simulations-
+//  schleife (Messen -> Reagieren -> Anzeigen) ausgefuehrt.
+// ============================================================================
 
-using namespace std;
+#include <atomic>
+#include <chrono>
+#include <csignal>
+#include <memory>
+#include <thread>
+
+#include "Anzeige.h"
+#include "Sensor.h"
+#include "SmartHome.h"
+
+// Sorgt dafuer, dass auch Strg+C die Schleife sauber beendet und der
+// TerminalGuard das Terminal wiederherstellen kann (siehe Anzeige.h).
+static std::atomic<bool> laufen(true);
+
+static void signalBehandeln(int) {
+    laufen = false;
+}
 
 int main() {
-    srand(static_cast<unsigned int>(time(0)));
+    std::signal(SIGINT, signalBehandeln);
 
-    cout << "==========================================" << endl;
-    cout << "   Smart Home Sensor Simulation" << endl;
-    cout << "   Simuliert 24 Stunden (Tick = Stunde)" << endl;
-    cout << "==========================================" << endl;
+    // 1) Smart Home zusammenbauen ------------------------------------------
+    //    Das SmartHome besitzt Sensoren und Aktoren (Komposition), die
+    //    Regeln verknuepfen sie nur ueber Zeiger (Assoziation).
+    SmartHome haus("Mein Zuhause", "messdaten.csv");
 
-    SensorStation station("Wohnzimmer");
+    Sensor* temperatur = haus.sensorHinzufuegen(std::make_unique<TemperaturSensor>("Temperatur Wohnzimmer"));
+    Sensor* helligkeit = haus.sensorHinzufuegen(std::make_unique<LichtSensor>("Helligkeit Garten"));
+    Sensor* feuchte    = haus.sensorHinzufuegen(std::make_unique<FeuchtigkeitsSensor>("Luftfeuchte Bad"));
 
-    // two temperature sensors: different base values and offsets
-    station.sensorHinzufuegen(new TemperaturSensor("Innentemperatur",  21.0, 3.0));
-    station.sensorHinzufuegen(new TemperaturSensor("Aussentemperatur", 14.0, 7.0, -1.5));
+    Aktor* heizung  = haus.aktorHinzufuegen("Heizung");
+    Aktor* licht    = haus.aktorHinzufuegen("Gartenlicht");
+    Aktor* lueftung = haus.aktorHinzufuegen("Lüftung");
 
-    // keep pointer to control licht and co2 during simulation
-    LichtSensor* licht = new LichtSensor("Lichtsensor", 50000.0);
-    station.sensorHinzufuegen(licht);
+    // Regeln mit Hysterese: einSchwelle < ausSchwelle -> EIN bei Unterschreitung
+    haus.regelHinzufuegen(temperatur, heizung, 19.5, 22.5);   // heizen, wenn kalt
+    haus.regelHinzufuegen(helligkeit, licht, 150.0, 260.0);   // Licht an, wenn dunkel
+    haus.regelHinzufuegen(feuchte, lueftung, 65.0, 55.0);     // lueften, wenn feucht
 
-    station.sensorHinzufuegen(new LuftfeuchtigkeitsSensor("Luftfeuchtigkeit", 55.0, 12.0));
+    // 2) Simulationsschleife -------------------------------------------------
+    TerminalGuard terminal;   // RAII: stellt das Terminal am Ende wieder her
+    Anzeige anzeige;
 
-    CO2Sensor* co2 = new CO2Sensor("CO2-Sensor", 420.0);
-    co2->setFensterOffen(false);
-    station.sensorHinzufuegen(co2);
+    int intervallMs = 700;    // Echtzeit pro Simulationsschritt (5 Sim-Minuten)
+    bool pause = false;
+    bool neuZeichnen = true;  // nur zeichnen, wenn sich etwas geaendert hat
+    int leerlauf = 0;
+    auto letzterSchritt = std::chrono::steady_clock::now();
 
-    station.statusAnzeigen();
+    haus.simulationsschritt();   // erste Messung sofort ausfuehren
 
-    cout << "\n--- Starte Simulation ---" << endl;
-
-    for (int tick = 0; tick < 24; tick++) {
-        // light sensor is inactive at night
-        if (tick == 6)  licht->aktivieren();
-        if (tick == 22) licht->deaktivieren();
-
-        // open window at 8:00, close again at 18:00
-        if (tick == 8) {
-            cout << "\n  >> Fenster wird geoeffnet" << endl;
-            co2->setFensterOffen(true);
+    while (laufen) {
+        // Tastatureingaben verarbeiten
+        int taste = Anzeige::tasteLesen();
+        if (taste != -1) {
+            neuZeichnen = true;
         }
-        if (tick == 18) {
-            cout << "\n  >> Fenster wird geschlossen" << endl;
-            co2->setFensterOffen(false);
+        if (taste == 'q' || taste == 'Q') {
+            laufen = false;
+        } else if (taste == ' ') {
+            pause = !pause;
+        } else if (taste == '+' || taste == '=') {
+            intervallMs = std::max(200, intervallMs - 150);   // schneller
+        } else if (taste == '-') {
+            intervallMs = std::min(2000, intervallMs + 150);  // langsamer
+        } else if (taste == 'k' || taste == 'K') {
+            haus.kalibrieren();
+        } else if (taste >= '1' && taste <= '9') {
+            haus.sensorUmschalten(static_cast<std::size_t>(taste - '1'));
         }
 
-        station.allesMessen(tick);
+        // naechsten Simulationsschritt ausfuehren, wenn das Intervall um ist
+        auto jetzt = std::chrono::steady_clock::now();
+        if (!pause && jetzt - letzterSchritt >= std::chrono::milliseconds(intervallMs)) {
+            haus.simulationsschritt();
+            letzterSchritt = jetzt;
+            neuZeichnen = true;
+        }
+
+        // einmal pro Sekunde auch ohne Aenderung zeichnen (z.B. nach Resize)
+        if (++leerlauf >= 20) {
+            neuZeichnen = true;
+        }
+        if (neuZeichnen) {
+            anzeige.zeichnen(haus, intervallMs, pause);
+            neuZeichnen = false;
+            leerlauf = 0;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
-
-    station.statistikAnzeigen();
 
     return 0;
 }

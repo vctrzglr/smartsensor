@@ -1,72 +1,103 @@
 #pragma once
 #include <string>
 #include <vector>
-using namespace std;
+#include "Messwert.h"
 
-// --- Messwert ---
-
-class Messwert {
-private:
-    double wert;
-    string einheit;
-    int tick;
-
-public:
-    Messwert();
-    Messwert(double w, string e, int t);
-
-    double getWert() const;
-    string getEinheit() const;
-    int    getTick() const;
-
-    void anzeigen() const;
-};
-
-// --- Messverlauf ---
-
-class Messverlauf {
-private:
-    string sensorName;
-    vector<Messwert> messungen;
-
-public:
-    Messverlauf();
-    Messverlauf(string name);
-
-    void hinzufuegen(const Messwert& mw);
-
-    void anzeigen() const;
-    void anzeigen(int letzteN) const;
-
-    double getDurchschnitt() const;
-    double getMin() const;
-    double getMax() const;
-    int    getAnzahl() const;
-    string getSensorName() const;
-};
-
-// --- Sensor (Basisklasse) ---
-
+// Abstrakte Basisklasse fuer alle Sensoren im Smart Home.
+//
+// messen() steuert den gemeinsamen Ablauf jeder Messung (Betriebszustand,
+// Stoerungen, Offset-Drift, Plausibilitaetspruefung, Historie).
+// Die eigentliche "Physik" liefert jede Unterklasse ueber die rein
+// virtuelle Methode simuliereRohwert() -> Vererbung + Polymorphie.
 class Sensor {
 private:
-    string name;
-    string einheit;
-    bool   aktiv;
-    double offset;
+    std::string name;
+    std::string einheit;
+    bool betriebszustand;
+    double offset;              // langsame Drift, wird durch kalibrieren() entfernt
+    double bereichVon;          // Plausibilitaetsbereich: alles ausserhalb wird verworfen
+    double bereichBis;
+    double anzeigeVon;          // Skala fuer die Balkenanzeige im Dashboard
+    double anzeigeBis;
+    int nachkommastellen;
+    std::vector<Messwert> historie;   // nur gueltige Messwerte
+
+    static const std::size_t MAX_HISTORIE = 288;   // ein kompletter Simulationstag
 
 public:
-    Sensor(string n, string e, double offset = 0.0);
-    virtual ~Sensor() = default;
+    Sensor(std::string name, std::string einheit,
+           double bereichVon, double bereichBis,
+           double anzeigeVon, double anzeigeBis, int nachkommastellen);
+    virtual ~Sensor();
 
-    virtual Messwert messen(int tick) const = 0;
-    virtual string   getTyp() const = 0;
+    // Gemeinsamer Messablauf fuer alle Sensortypen (Schablone)
+    Messwert messen(int minuteDesTages);
 
-    void   aktivieren();
-    void   deaktivieren();
-    bool   isAktiv() const;
-    string getName() const;
-    string getEinheit() const;
+    bool kalibrieren();                          // setzt den Offset zurueck
+    void setBetriebszustand(bool an);
+
+    // Rueckwirkung eines Aktors auf die Umgebung (Standard: keine Wirkung).
+    // Wird von den Unterklassen ueberschrieben, z.B. Heizung waermt den Raum.
+    virtual void beeinflussen(bool aktorAn);
+
+    const std::string& getName() const;
+    const std::string& getEinheit() const;
+    bool istInBetrieb() const;
     double getOffset() const;
+    double getAnzeigeVon() const;
+    double getAnzeigeBis() const;
+    int getNachkommastellen() const;
+    const std::vector<Messwert>& getHistorie() const;
 
-    void anzeigen() const;
+    bool hatMesswert() const;
+    const Messwert& letzterMesswert() const;
+
+    // Statistik ueber die gespeicherte Historie
+    double minimum() const;
+    double maximum() const;
+    double mittelwert() const;
+
+protected:
+    // liefert den "wahren" physikalischen Wert zum angegebenen Zeitpunkt
+    virtual double simuliereRohwert(int minuteDesTages) = 0;
+};
+
+// ---------------------------------------------------------------------------
+// Konkrete Sensoren
+// ---------------------------------------------------------------------------
+
+// Raumtemperatur: Tagesgang (nachts kuehl, nachmittags warm) + Heizungswaerme
+class TemperaturSensor : public Sensor {
+private:
+    double heizEffekt;   // zusaetzliche Waerme durch die Heizung (0..4 Grad)
+
+public:
+    TemperaturSensor(std::string name);
+    void beeinflussen(bool heizungAn) override;
+
+protected:
+    double simuliereRohwert(int minuteDesTages) override;
+};
+
+// Aussenhelligkeit: Sonnenstand zwischen 06:00 und 21:00 Uhr, nachts dunkel
+class LichtSensor : public Sensor {
+public:
+    LichtSensor(std::string name);
+
+protected:
+    double simuliereRohwert(int minuteDesTages) override;
+};
+
+// Luftfeuchte: zufaelliges Auf und Ab, die Lueftung senkt die Feuchte
+class FeuchtigkeitsSensor : public Sensor {
+private:
+    double feuchte;      // aktueller "wahrer" Zustand des Raums
+    bool lueftungAn;
+
+public:
+    FeuchtigkeitsSensor(std::string name);
+    void beeinflussen(bool lueftungAn) override;
+
+protected:
+    double simuliereRohwert(int minuteDesTages) override;
 };
